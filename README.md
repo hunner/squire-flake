@@ -24,8 +24,13 @@ path would collide or eventually get clobbered.
 From inside a squire task, or before launching one:
 
 ```
-squire nix set --flake github:hunner/squire-flake --target homeConfigurations.squire
+squire nix set --flake "git+https://github.com/hunner/squire-flake.git" --target homeConfigurations.squire
 ```
+
+Use `git+https://`, not `github:` — the latter resolves through the GitHub
+REST API (`api.github.com/repos/.../commits/HEAD`), which task envs share an
+egress IP against and routinely rate-limit or 403 on. `git+https://` is a
+plain git-over-HTTPS clone with no API calls involved.
 
 Takes effect on the next environment start.
 
