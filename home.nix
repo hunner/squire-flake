@@ -1,20 +1,16 @@
 { config, lib, pkgs, ... }:
 
 let
-  # The command Claude Code / Codex run on every UserPromptSubmit. Bare
-  # `date` invocation — Claude Code accepts plain stdout as additionalContext
-  # for this event, no JSON wrapping required.
+  # Bare `date` — Claude Code accepts plain stdout as additionalContext for
+  # UserPromptSubmit, no JSON wrapping needed.
   clockCmd = "date '+Current local time: %A %Y-%m-%d %H:%M:%S %Z'";
 
-  # store-path derivations rather than heredocs: a heredoc body written
-  # inline in an indented `''...''` Nix string picks up whatever leading
-  # whitespace the surrounding block needs for readability, which corrupts
-  # both the TOML and (fatally, since it's whitespace-sensitive) the Python.
+  # writeText, not a heredoc: an indented heredoc body inside a Nix ''...''
+  # string inherits the block's indentation, which breaks whitespace-sensitive
+  # Python.
   codexHookScript = pkgs.writeText "codex-clock-hook.py" (builtins.readFile ./files/codex-clock-hook.py);
 
   codexConfigToml = pkgs.writeText "codex-system-config.toml" ''
-    # Managed by squire-flake (home-manager). See home.nix for why this
-    # lives in Codex's System config layer instead of ~/.codex/config.toml.
     [[hooks.UserPromptSubmit]]
     [[hooks.UserPromptSubmit.hooks]]
     type = "command"
@@ -27,41 +23,29 @@ in
   home.homeDirectory = "/home/squire";
   home.stateVersion = "26.05";
 
-  # --- oh-my-pi -----------------------------------------------------------
-  # oh-my-pi auto-discovers *.ts hook factories under
-  # ~/.omp/agent/hooks/pre/. Squire only manages ~/.omp/agent/config.yml
-  # (see docs/env-personalization-surface.md in squire), never this path, so
-  # it's safe to own declaratively.
+  home.packages = with pkgs; [
+    go
+    rustc
+    cargo
+  ];
+
+  # oh-my-pi auto-discovers *.ts hooks under ~/.omp/agent/hooks/pre/; squire
+  # only manages ~/.omp/agent/config.yml, so this path is safe to own
+  # declaratively.
   home.file.".omp/agent/hooks/pre/clock.ts".source = ./files/omp-clock-hook.ts;
 
-  # --- Claude Code + Codex --------------------------------------------------
-  # Both ~/.claude/settings.json and ~/.codex/config.toml / hooks.json are
-  # (re)written wholesale by squire's own agent-config apply, which runs
-  # *before* this home-manager activation on every env start (see squire's
-  # pkg/envmgr/nixsetup package doc comment: nixsetup runs "after agent
-  # config is applied"). A declarative home.file for either path would
-  # collide with squire's own file and fail activation, so both are handled
-  # imperatively below instead.
+  # Claude Code (~/.claude/settings.json) and Codex (~/.codex/config.toml,
+  # hooks.json) are both rewritten by squire's own agent-config apply, which
+  # runs before this activation on every env start — so a declarative
+  # home.file for either would collide. Handled imperatively instead:
   #
-  # Claude Code: squire's writeClaudeSettings round-trips the `hooks` map and
-  # only strips command signatures it recognizes as its own (its SessionStart
-  # hook, icm's hooks — see stripSquireManagedSessionStart /
-  # stripICMHookEntries in pkg/envmgr/agentconfig/claudecode_config.go).
-  # A UserPromptSubmit entry with our own command is left untouched, so a
-  # plain idempotent merge is safe and durable across squire's re-applies.
-  #
-  # Codex: squire's Configure() (pkg/agent/codex/harness.go) and
-  # installHooks() (pkg/agent/codex/hooks.go) both rewrite
-  # ~/.codex/config.toml and ~/.codex/hooks.json from scratch every apply —
-  # no round-trip, so anything we add there would eventually get clobbered.
-  # Instead we use Codex's *System* config layer at /etc/codex/config.toml,
-  # a layer squire never touches. It's also auto-trusted: codex maps
-  # `ConfigLayerSource::System` to `is_managed = true`, which maps straight
-  # to `HookTrustStatus::Managed` (see codex-rs/hooks/src/engine/
-  # discovery.rs: hook_metadata_for_config_layer_source /
-  # hook_trust_status), skipping the trusted_hash dance squire uses for its
-  # own SessionStart hook entirely. Writing to /etc requires root; squire
-  # grants the `squire` user passwordless sudo (Dockerfile.base).
+  # - Claude: squire's writer round-trips `hooks` and only strips its own
+  #   known command signatures, so merging our entry in is safe long-term.
+  # - Codex: squire's writer rewrites config.toml/hooks.json from scratch
+  #   every apply (no round-trip), so anything added at the user layer would
+  #   eventually get clobbered. Codex's *System* layer (/etc/codex/config.toml)
+  #   is never touched by squire and is auto-trusted (System -> is_managed ->
+  #   HookTrustStatus::Managed), skipping the trusted_hash dance entirely.
   home.activation.agentPromptSubmitHooks = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     claude_settings="$HOME/.claude/settings.json"
     mkdir -p "$(dirname "$claude_settings")"
@@ -78,8 +62,10 @@ in
       "$claude_settings" > "$claude_tmp"
     mv "$claude_tmp" "$claude_settings"
 
-    sudo mkdir -p /etc/codex/hooks
-    sudo install -m 0755 ${codexHookScript} /etc/codex/hooks/clock.py
-    sudo install -m 0644 ${codexConfigToml} /etc/codex/config.toml
+    # Absolute path: home-manager activation runs with a nix-store-only PATH,
+    # so plain `sudo` isn't found even though it exists on the system.
+    /usr/bin/sudo mkdir -p /etc/codex/hooks
+    /usr/bin/sudo install -m 0755 ${codexHookScript} /etc/codex/hooks/clock.py
+    /usr/bin/sudo install -m 0644 ${codexConfigToml} /etc/codex/config.toml
   '';
 }
