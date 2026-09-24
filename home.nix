@@ -52,14 +52,20 @@ in
     mkdir -p "$(dirname "$claude_settings")"
     [ -f "$claude_settings" ] || echo '{}' > "$claude_settings"
 
+    # Marker-based strip-then-add (not exact-string match): a past version of
+    # this flake could have written a different clockCmd (e.g. before the TZ
+    # fix), and exact matching would leave that stale entry behind as a
+    # duplicate instead of replacing it.
     claude_tmp="$(mktemp)"
     ${pkgs.jq}/bin/jq \
       --arg cmd ${lib.escapeShellArg clockCmd} \
+      --arg marker "Current local time" \
       '.hooks = (.hooks // {})
-       | .hooks.UserPromptSubmit = ((.hooks.UserPromptSubmit // []) as $groups
-           | if ($groups | any(.hooks[]?.command == $cmd)) then $groups
-             else $groups + [{"hooks": [{"type": "command", "command": $cmd, "timeout": 5}]}]
-             end)' \
+       | .hooks.UserPromptSubmit = (
+           ((.hooks.UserPromptSubmit // [])
+             | map(select(([.hooks[]?.command // ""] | any(contains($marker))) | not)))
+           + [{"hooks": [{"type": "command", "command": $cmd, "timeout": 5}]}]
+         )' \
       "$claude_settings" > "$claude_tmp"
     mv "$claude_tmp" "$claude_settings"
 
