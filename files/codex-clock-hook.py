@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 
-"""Codex UserPromptSubmit hook: injects the current local time as
-additionalContext. Direct python3 command (no shell hop) matches squire's own
-SessionStart hook convention (see pkg/agent/codex/hooks/session_start_map.py
-in the squire repo)."""
+"""Codex UserPromptSubmit hook: injects the current time in Pacific
+(America/Los_Angeles) as additionalContext, regardless of the container's
+system timezone."""
 
 import json
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 
 def main() -> int:
-    now = datetime.now().astimezone().strftime("%A %Y-%m-%d %H:%M:%S %Z")
+    now = datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%A %Y-%m-%d %H:%M:%S %Z")
     output = {
         "hookSpecificOutput": {
             "hookEventName": "UserPromptSubmit",

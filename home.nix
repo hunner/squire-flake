@@ -2,8 +2,9 @@
 
 let
   # Bare `date` — Claude Code accepts plain stdout as additionalContext for
-  # UserPromptSubmit, no JSON wrapping needed.
-  clockCmd = "date '+Current local time: %A %Y-%m-%d %H:%M:%S %Z'";
+  # UserPromptSubmit, no JSON wrapping needed. TZ forces Pacific regardless
+  # of the container's system timezone.
+  clockCmd = "TZ='America/Los_Angeles' date '+Current local time: %A %Y-%m-%d %H:%M:%S %Z'";
 
   # writeText, not a heredoc: an indented heredoc body inside a Nix ''...''
   # string inherits the block's indentation, which breaks whitespace-sensitive
