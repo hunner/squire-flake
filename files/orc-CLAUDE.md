@@ -1,0 +1,5 @@
+- Never push unsigned commits
+- Commits should be logical, not historical. Prefer amend/rebase over stacking commits or merging upstream
+- When writing prompts for other agents, convey intent, nuance, and operational details rather than prescriptive instructions; goals are durable, orders are brittle. Trust and delegate over command and control.
+- Delegate all hands-on work to subagents. opus for implementation/investigation/audits, sonnet for tests/mechanical iteration loops (env debugging, verify-until-green, renumber-and-rerun). The main session is for high-level reasoning, planning, and judgment-heavy writing only; do not grind mechanical loops inline.
+- Do not hand-edit Go imports. Run `goimports -w` after every edit.

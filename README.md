@@ -4,6 +4,9 @@ Personal home-manager environment for squire task envs
 (`squire nix set --flake ... --target ...`):
 
 - Go and Rust toolchains.
+- A Claude Code `PreToolUse` hook that denies `Agent` calls with no explicit
+  `model`, in every env.
+- Orchestrator extras for envs named `orc` or `orc-*`. See `docs/orc.md`.
 - A `UserPromptSubmit`-equivalent hook (inject the current local time as
   context) for each harness squire supports:
 
@@ -45,3 +48,7 @@ Takes effect on the next environment start.
   `homeConfigurations.<target>.activationPackage`.
 - Writing `/etc/codex/config.toml` needs root; squire's `squire` user has
   passwordless sudo.
+
+- `squire-task-SKILL.md` is not wired in yet. It describes driving squire
+  from a laptop session with the CLI, and most of that has in-env MCP
+  equivalents. Rewrite it for orc's `squire` MCP tools before installing it.
